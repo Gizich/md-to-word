@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD to Word Converter</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Marked.js для парсинга Markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- FileSaver.js для сохранения файлов -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <!-- html-docx-js для конвертации HTML в DOCX -->
+    <!-- Используем UMD версию для браузера -->
+    <script src="https://cdn.jsdelivr.net/npm/html-docx-js@0.3.1/dist/html-docx.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Стилизация скроллбара */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        /* Стили для области предпросмотра (симуляция листа бумаги) */
+        .preview-page {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.5;
+            color: #000;
+        }
+        
+        .preview-page h1 { font-size: 24pt; font-weight: bold; margin-bottom: 1em; }
+        .preview-page h2 { font-size: 18pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+        .preview-page h3 { font-size: 14pt; font-weight: bold; margin-top: 1em; margin-bottom: 0.5em; }
+        .preview-page p { margin-bottom: 1em; text-align: justify; }
+        .preview-page ul { list-style-type: disc; margin-left: 2em; margin-bottom: 1em; }
+        .preview-page ol { list-style-type: decimal; margin-left: 2em; margin-bottom: 1em; }
+        .preview-page blockquote { 
+            border-left: 4px solid #ccc; 
+            padding-left: 1em; 
+            margin-left: 0; 
+            color: #555;
+            font-style: italic;
+        }
+        .preview-page pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            margin-bottom: 1em;
+        }
+        .preview-page code {
+            font-family: 'Courier New', Courier, monospace;
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .preview-page table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1em;
+        }
+        .preview-page th, .preview-page td {
+            border: 1px solid #000;
+            padding: 6px;
+            text-align: left;
+        }
+        .preview-page img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 z-10">
+        <div class="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 text-white p-2 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">MD to Word</h1>
+                        <p class="text-xs text-gray-500">Конвертер для Эдуарда</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input type="file" id="fileInput" accept=".md,.txt" class="hidden">
+                    <button onclick="document.getElementById('fileInput').click()" 
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Загрузить MD
+                    </button>
+                    <button onclick="copyToClipboard()" 
+                            class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                        Копировать
+                    </button>
+                    <button onclick="convertAndDownload()" 
+                            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Скачать .docx
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Editor Section -->
+        <section class="flex-1 flex flex-col border-r border-gray-200 bg-white min-w-[300px]">
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Markdown редактор</span>
+                <span class="text-xs text-gray-400" id="charCount">0 символов</span>
+            </div>
+            <textarea id="editor" 
+                      class="flex-1 p-6 w-full h-full resize-none focus:outline-none font-mono text-sm leading-relaxed text-gray-800"
+                      placeholder="Введите Markdown текст здесь...
+# Заголовок 1
+## Заголовок 2
+
+Текст абзаца с **жирным** и *курсивным* выделением.
+
+- Элемент списка 1
+- Элемент списка 2
+
+1. Нумерованный список
+2. Второй пункт"></textarea>
+        </section>
+
+        <!-- Preview Section -->
+        <section class="flex-1 flex flex-col bg-gray-100 min-w-[300px] relative">
+            <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex justify-between items-center z-10 shadow-sm">
+                <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Предпросмотр (Word Style)</span>
+            </div>
+            
+            <div class="flex-1 overflow-auto p-8 flex justify-center bg-gray-200/50">
+                <!-- Paper Sheet Simulation -->
+                <div id="preview" class="preview-page bg-white shadow-lg w-full max-w-[21cm] min-h-[29.7cm] p-[2.5cm]">
+                    <!-- Content renders here -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg transform translate-y-20 opacity-0 transition-all duration-300">
+        Уведомление
+    </div>
+
+    <script>
+        // Инициализация элементов
+        const editor = document.getElementById('editor');
+        const preview = document.getElementById('preview');
+        const fileInput = document.getElementById('fileInput');
+        const charCount = document.getElementById('charCount');
+        const toast = document.getElementById('toast');
+
+        // Пример текста по умолчанию
+        const defaultText = `# Пример документа
+
+Это демонстрация конвертера Markdown в Word.
+
+## Возможности
+
+Вы можете использовать стандартный синтаксис Markdown:
+
+1. **Жирный текст** и *курсив*
+2. Списки (маркированные и нумерованные)
+3. Таблицы
+
+| Параметр | Значение |
+|----------|----------|
+| Формат   | .docx    |
+| Скорость | Высокая  |
+
+> "Цитаты тоже поддерживаются и будут выглядеть соответствующе."
+
+## Как использовать
+Просто начните печатать слева, и документ обновится справа. Нажмите "Скачать .docx", чтобы сохранить результат.
+`;
+
+        // Функция обновления предпросмотра
+        function updatePreview() {
+            const markdownText = editor.value;
+            // Обновляем счетчик символов
+            charCount.textContent = `${markdownText.length} символов`;
+            
+            // Парсим Markdown в HTML
+            const htmlContent = marked.parse(markdownText);
+            
+            // Вставляем HTML в превью
+            preview.innerHTML = htmlContent;
+        }
+
+        // Слушатель ввода текста
+        editor.addEventListener('input', updatePreview);
+
+        // Загрузка файла
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                editor.value = e.target.result;
+                updatePreview();
+                showToast(`Файл "${file.name}" загружен`);
+            };
+            reader.readAsText(file);
+            // Сброс value, чтобы можно было загрузить тот же файл снова
+            fileInput.value = '';
+        });
+
+        // Функция копирования в буфер обмена (с форматированием)
+        function copyToClipboard() {
+            try {
+                // Создаем диапазон (range) для выбора содержимого preview
+                const range = document.createRange();
+                range.selectNode(preview);
+                
+                // Очищаем текущее выделение и добавляем наше
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                
+                // Выполняем команду копирования
+                const successful = document.execCommand('copy');
+                
+                // Снимаем выделение
+                window.getSelection().removeAllRanges();
+                
+                if (successful) {
+                    showToast('Текст скопирован в буфер (с форматированием)');
+                } else {
+                    showToast('Не удалось скопировать текст');
+                }
+            } catch (err) {
+                console.error('Ошибка при копировании:', err);
+                showToast('Ошибка при копировании');
+            }
+        }
+
+        // Функция экспорта в DOCX
+        function convertAndDownload() {
+            try {
+                showToast('Генерация файла...', 2000);
+
+                const contentHtml = marked.parse(editor.value);
+                
+                // Создаем полную структуру HTML для конвертера
+                // Важно добавить базовые стили, чтобы Word их подхватил
+                const styledHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <style>
+                            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
+                            h1 { font-size: 24pt; font-weight: bold; color: #2E74B5; }
+                            h2 { font-size: 18pt; font-weight: bold; color: #2E74B5; margin-top: 15pt; }
+                            h3 { font-size: 14pt; font-weight: bold; color: #1F4D78; }
+                            table { border-collapse: collapse; width: 100%; margin-bottom: 10pt; }
+                            td, th { border: 1px solid #000; padding: 5pt; }
+                            th { background-color: #F2F2F2; font-weight: bold; }
+                            code { font-family: 'Courier New', monospace; background-color: #F2F2F2; padding: 2px; }
+                            pre { background-color: #F2F2F2; padding: 10pt; font-family: 'Courier New', monospace; }
+                            blockquote { border-left: 3px solid #ccc; padding-left: 10pt; color: #666; font-style: italic; }
+                        </style>
+                    </head>
+                    <body>
+                        ${contentHtml}
+                    </body>
+                    </html>
+                `;
+
+                // Используем html-docx-js для конвертации
+                // Проверяем доступность библиотеки
+                if (typeof htmlDocx === 'undefined') {
+                    throw new Error("Библиотека конвертации не загрузилась. Проверьте интернет.");
+                }
+
+                // asBlob конвертирует HTML строку в бинарный Blob формата docx
+                const converted = htmlDocx.asBlob(styledHtml);
+                
+                // Сохраняем файл
+                saveAs(converted, 'document.docx');
+                showToast('Файл успешно скачан!');
+
+            } catch (error) {
+                console.error(error);
+                showToast('Ошибка при создании файла: ' + error.message);
+                // Fallback: пробуем простой метод экспорта, если библиотека отказала
+                fallbackExport();
+            }
+        }
+
+        // Резервный метод (если библиотека не сработает)
+        function fallbackExport() {
+            try {
+                const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' "+
+                                "xmlns:w='urn:schemas-microsoft-com:office:word' "+
+                                "xmlns='http://www.w3.org/TR/REC-html40'>"+
+                                "<head><meta charset='utf-8'><title>Export HTML to Word Document with JavaScript</title></head><body>";
+                const footer = "</body></html>";
+                const sourceHTML = header + document.getElementById("preview").innerHTML + footer;
+                
+                const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+                const fileDownload = document.createElement("a");
+                document.body.appendChild(fileDownload);
+                fileDownload.href = source;
+                fileDownload.download = 'document_simple.doc';
+                fileDownload.click();
+                document.body.removeChild(fileDownload);
+                showToast('Использован альтернативный метод загрузки (.doc)');
+            } catch(e) {
+                alert("Не удалось сохранить файл.");
+            }
+        }
+
+        // Вспомогательная функция для уведомлений
+        function showToast(message, duration = 3000) {
+            toast.textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, duration);
+        }
+
+        // Установка начального значения
+        editor.value = defaultText;
+        updatePreview();
+
+    </script>
+</body>
+</html>
